@@ -7,6 +7,7 @@ const canvas = document.getElementById('scene');
 const statusEl = document.getElementById('status');
 const hintEl = document.getElementById('hint');
 const modelSelectEl = document.getElementById('modelSelect');
+const touchPadEl = document.getElementById('touchPad');
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -34,22 +35,66 @@ scene.add(sun);
 const input = { forward: 0, turn: 0, turbo: false };
 const pressed = new Set();
 
-const onKey = (event, down) => {
-  const k = event.key.toLowerCase();
-  if (down) {
-    pressed.add(k);
-  } else {
-    pressed.delete(k);
-  }
+const normalizeKey = (key) => {
+  const k = (key || '').toLowerCase();
+  if (k === 'arrowup') return 'w';
+  if (k === 'arrowdown') return 's';
+  if (k === 'arrowleft') return 'a';
+  if (k === 'arrowright') return 'd';
+  return k;
+};
+
+const refreshInput = () => {
   input.forward = (pressed.has('w') || pressed.has('arrowup') ? 1 : 0) + (pressed.has('s') || pressed.has('arrowdown') ? -1 : 0);
   input.turn = (pressed.has('a') || pressed.has('arrowleft') ? 1 : 0) + (pressed.has('d') || pressed.has('arrowright') ? -1 : 0);
   input.turbo = pressed.has('shift');
 };
 
-window.addEventListener('keydown', (e) => onKey(e, true));
-window.addEventListener('keyup', (e) => onKey(e, false));
+const setKeyPressed = (rawKey, down) => {
+  const k = normalizeKey(rawKey);
+  if (!k) return;
+  if (down) pressed.add(k);
+  else pressed.delete(k);
+  refreshInput();
+};
 
-await RAPIER.init();
+window.addEventListener('keydown', (e) => setKeyPressed(e.key, true));
+window.addEventListener('keyup', (e) => setKeyPressed(e.key, false));
+
+if (touchPadEl) {
+  const setButtonVisual = (el, down) => {
+    el.classList.toggle('active', down);
+  };
+  const bindTouchButton = (btn) => {
+    const key = btn.dataset.key;
+    if (!key) return;
+    const down = (ev) => {
+      ev.preventDefault();
+      setButtonVisual(btn, true);
+      setKeyPressed(key, true);
+    };
+    const up = (ev) => {
+      ev.preventDefault();
+      setButtonVisual(btn, false);
+      setKeyPressed(key, false);
+    };
+    btn.addEventListener('pointerdown', down);
+    btn.addEventListener('pointerup', up);
+    btn.addEventListener('pointercancel', up);
+    btn.addEventListener('pointerleave', up);
+  };
+  touchPadEl.querySelectorAll('.btn').forEach(bindTouchButton);
+}
+
+const originalWarn = console.warn.bind(console);
+console.warn = (...args) => {
+  const msg = String(args[0] ?? '');
+  if (msg.includes('using deprecated parameters for the initialization function')) return;
+  if (msg.includes('THREE.ColladaLoader: You are loading an asset with a Z-UP coordinate system')) return;
+  originalWarn(...args);
+};
+
+await RAPIER.init({});
 const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
 world.timestep = 1 / 60;
 

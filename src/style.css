@@ -21,6 +21,7 @@ body,
   width: 100%;
   height: 100%;
   display: block;
+  touch-action: none;
 }
 
 .hud {
@@ -62,4 +63,39 @@ body,
   font-size: 12px;
   background: rgba(255, 255, 255, 0.92);
   color: #0f172a;
+}
+
+.touch-pad {
+  position: fixed;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  width: min(92vw, 420px);
+  display: none;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+  z-index: 4;
+}
+
+.touch-pad .btn {
+  border: 1px solid rgba(33, 49, 70, 0.24);
+  background: rgba(255, 255, 255, 0.88);
+  color: #0f172a;
+  font-weight: 700;
+  border-radius: 10px;
+  height: 46px;
+  font-size: 16px;
+  touch-action: manipulation;
+}
+
+.touch-pad .btn:active,
+.touch-pad .btn.active {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: rgba(37, 99, 235, 0.55);
+}
+
+@media (max-width: 900px), (pointer: coarse) {
+  .touch-pad {
+    display: grid;
+  }
 }
