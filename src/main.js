@@ -194,6 +194,11 @@ const MODEL_PRESETS = {
     label: 'Unitree B2',
     base: 'https://raw.githubusercontent.com/unitreerobotics/unitree_ros/master/robots/b2_description/meshes',
     color: { trunk: '#ced8e8', thigh: '#9baec9', calf: '#839ab8' }
+  },
+  duckmini: {
+    label: 'OpenDuck Mini',
+    procedural: true,
+    color: { trunk: '#ffd766', thigh: '#ffb14a', calf: '#ff9a3d' }
   }
 };
 
@@ -249,6 +254,68 @@ async function loadSkinAssets(modelKey) {
   const preset = MODEL_PRESETS[modelKey];
   if (!preset) {
     throw new Error(`Unknown model preset: ${modelKey}`);
+  }
+
+  if (preset.procedural) {
+    const bodyMat = new THREE.MeshStandardMaterial({
+      color: preset.color.trunk,
+      metalness: 0.08,
+      roughness: 0.52
+    });
+    const accentMat = new THREE.MeshStandardMaterial({
+      color: '#ff8a24',
+      metalness: 0.04,
+      roughness: 0.55
+    });
+    const darkMat = new THREE.MeshStandardMaterial({
+      color: '#1f2937',
+      metalness: 0.1,
+      roughness: 0.62
+    });
+
+    const trunk = new THREE.Group();
+    const belly = new THREE.Mesh(new THREE.SphereGeometry(0.26, 28, 20), bodyMat);
+    belly.scale.set(1.45, 1.0, 1.0);
+    trunk.add(belly);
+
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.16, 24, 20), bodyMat);
+    head.position.set(0.3, 0.1, 0);
+    trunk.add(head);
+
+    const beak = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.12, 16), accentMat);
+    beak.rotation.z = -Math.PI * 0.5;
+    beak.position.set(0.43, 0.08, 0);
+    trunk.add(beak);
+
+    const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.018, 12, 12), darkMat);
+    const eyeR = eyeL.clone();
+    eyeL.position.set(0.36, 0.14, 0.06);
+    eyeR.position.set(0.36, 0.14, -0.06);
+    trunk.add(eyeL, eyeR);
+
+    const tail = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.14, 18), bodyMat);
+    tail.rotation.z = Math.PI * 0.75;
+    tail.position.set(-0.36, 0.02, 0);
+    trunk.add(tail);
+
+    const thigh = new THREE.Group();
+    const thighShell = new THREE.Mesh(new THREE.CapsuleGeometry(0.058, 0.14, 7, 14), accentMat);
+    thighShell.rotation.z = Math.PI * 0.5;
+    thigh.add(thighShell);
+
+    const calf = new THREE.Group();
+    const calfShell = new THREE.Mesh(new THREE.CapsuleGeometry(0.05, 0.16, 7, 14), accentMat);
+    calfShell.rotation.z = Math.PI * 0.5;
+    calf.add(calfShell);
+
+    const foot = new THREE.Mesh(new THREE.SphereGeometry(0.055, 16, 12), darkMat);
+    foot.scale.set(1.6, 0.55, 1.1);
+    foot.position.set(0, -0.11, 0);
+    calf.add(foot);
+
+    const assets = { trunk, thigh, calf };
+    skinCache.set(modelKey, assets);
+    return assets;
   }
 
   const loader = new ColladaLoader();
@@ -322,7 +389,7 @@ async function initSkins() {
   });
 
   window.addEventListener('keydown', async (event) => {
-    const map = { '1': 'a1', '2': 'aliengo', '3': 'b2' };
+    const map = { '1': 'a1', '2': 'aliengo', '3': 'b2', '4': 'duckmini' };
     const key = map[event.key];
     if (!key) {
       return;
@@ -401,7 +468,7 @@ function updateHud() {
   const speed = Math.hypot(vel.x, vel.z);
   const mode = input.turbo ? 'TURBO' : 'WALK';
   const model = MODEL_PRESETS[activeSkinKey]?.label ?? 'Fallback';
-  hintEl.textContent = 'WASD move, Shift turbo, Space hop, 1/2/3 model';
+  hintEl.textContent = 'WASD move, Shift turbo, Space hop, 1/2/3/4 model';
   if (!isLoadingSkin) {
     statusEl.textContent = `${model} | ${mode} | speed ${speed.toFixed(2)} m/s`;
   }
