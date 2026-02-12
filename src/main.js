@@ -182,23 +182,29 @@ let isLoadingSkin = false;
 const MODEL_PRESETS = {
   a1: {
     label: 'Unitree A1',
-    base: 'https://raw.githubusercontent.com/unitreerobotics/unitree_ros/master/robots/a1_description/meshes',
+    base: '/rapier/models/a1',
     color: { trunk: '#dbe4f2', thigh: '#b6c4d9', calf: '#a2b4cd' }
   },
   aliengo: {
     label: 'Unitree AlienGo',
-    base: 'https://raw.githubusercontent.com/unitreerobotics/unitree_ros/master/robots/aliengo_description/meshes',
+    base: '/rapier/models/aliengo',
     color: { trunk: '#d7deeb', thigh: '#a7b8d0', calf: '#90a7c8' }
   },
   b2: {
     label: 'Unitree B2',
-    base: 'https://raw.githubusercontent.com/unitreerobotics/unitree_ros/master/robots/b2_description/meshes',
+    base: '/rapier/models/b2',
     color: { trunk: '#ced8e8', thigh: '#9baec9', calf: '#839ab8' }
   },
   duckmini: {
     label: 'OpenDuck Mini',
     procedural: true,
     color: { trunk: '#ffd766', thigh: '#ffb14a', calf: '#ff9a3d' }
+  },
+  h1: {
+    label: 'Unitree H1 (Stylized)',
+    procedural: true,
+    humanoid: true,
+    color: { trunk: '#cfd8e3', thigh: '#9fb0c6', calf: '#889db8' }
   }
 };
 
@@ -254,6 +260,74 @@ async function loadSkinAssets(modelKey) {
   const preset = MODEL_PRESETS[modelKey];
   if (!preset) {
     throw new Error(`Unknown model preset: ${modelKey}`);
+  }
+
+  if (preset.procedural && preset.humanoid) {
+    const shell = new THREE.MeshStandardMaterial({
+      color: preset.color.trunk,
+      metalness: 0.2,
+      roughness: 0.5
+    });
+    const joint = new THREE.MeshStandardMaterial({
+      color: '#334155',
+      metalness: 0.15,
+      roughness: 0.62
+    });
+    const visor = new THREE.MeshStandardMaterial({
+      color: '#63a4ff',
+      metalness: 0.45,
+      roughness: 0.25
+    });
+
+    const trunk = new THREE.Group();
+    const torsoBlock = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.44, 0.3), shell);
+    torsoBlock.position.y = 0.02;
+    trunk.add(torsoBlock);
+
+    const chest = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.18, 0.24), shell);
+    chest.position.set(0.2, 0.1, 0);
+    trunk.add(chest);
+
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.18, 0.2), shell);
+    head.position.set(0.34, 0.22, 0);
+    trunk.add(head);
+
+    const visorPanel = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.08, 0.14), visor);
+    visorPanel.position.set(0.44, 0.22, 0);
+    trunk.add(visorPanel);
+
+    const shoulderL = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.22, 14), joint);
+    shoulderL.rotation.z = Math.PI * 0.5;
+    shoulderL.position.set(0.1, 0.12, 0.19);
+    const shoulderR = shoulderL.clone();
+    shoulderR.position.z = -0.19;
+    trunk.add(shoulderL, shoulderR);
+
+    const thigh = new THREE.Group();
+    const thighShell = new THREE.Mesh(new THREE.CapsuleGeometry(0.055, 0.17, 7, 14), new THREE.MeshStandardMaterial({
+      color: preset.color.thigh,
+      metalness: 0.14,
+      roughness: 0.56
+    }));
+    thighShell.rotation.z = Math.PI * 0.5;
+    thigh.add(thighShell);
+
+    const calf = new THREE.Group();
+    const shin = new THREE.Mesh(new THREE.CapsuleGeometry(0.048, 0.18, 7, 14), new THREE.MeshStandardMaterial({
+      color: preset.color.calf,
+      metalness: 0.14,
+      roughness: 0.58
+    }));
+    shin.rotation.z = Math.PI * 0.5;
+    calf.add(shin);
+
+    const foot = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.05, 0.1), joint);
+    foot.position.set(0, -0.12, 0);
+    calf.add(foot);
+
+    const assets = { trunk, thigh, calf };
+    skinCache.set(modelKey, assets);
+    return assets;
   }
 
   if (preset.procedural) {
@@ -389,7 +463,7 @@ async function initSkins() {
   });
 
   window.addEventListener('keydown', async (event) => {
-    const map = { '1': 'a1', '2': 'aliengo', '3': 'b2', '4': 'duckmini' };
+    const map = { '1': 'a1', '2': 'aliengo', '3': 'b2', '4': 'duckmini', '5': 'h1' };
     const key = map[event.key];
     if (!key) {
       return;
@@ -468,7 +542,7 @@ function updateHud() {
   const speed = Math.hypot(vel.x, vel.z);
   const mode = input.turbo ? 'TURBO' : 'WALK';
   const model = MODEL_PRESETS[activeSkinKey]?.label ?? 'Fallback';
-  hintEl.textContent = 'WASD move, Shift turbo, Space hop, 1/2/3/4 model';
+  hintEl.textContent = 'WASD move, Shift turbo, Space hop, 1/2/3/4/5 model';
   if (!isLoadingSkin) {
     statusEl.textContent = `${model} | ${mode} | speed ${speed.toFixed(2)} m/s`;
   }
