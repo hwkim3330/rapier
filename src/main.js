@@ -3,6 +3,8 @@ import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
 
 const canvas = document.getElementById('scene');
+const statusEl = document.getElementById('status');
+const hintEl = document.getElementById('hint');
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -10,67 +12,248 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 
 const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0xe2ecf9, 18, 70);
 
-const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 100);
-camera.position.set(9, 7, 10);
-camera.lookAt(0, 2, 0);
+const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 200);
+camera.position.set(-7, 5.5, 0);
 
-scene.add(new THREE.HemisphereLight(0xffffff, 0x64748b, 0.9));
-const dirLight = new THREE.DirectionalLight(0xffffff, 1.1);
-dirLight.position.set(7, 12, 6);
-dirLight.castShadow = true;
-scene.add(dirLight);
+const hemi = new THREE.HemisphereLight(0xf8fbff, 0x7c8aa0, 0.8);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xffffff, 1.2);
+sun.position.set(9, 14, 11);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -20;
+sun.shadow.camera.right = 20;
+sun.shadow.camera.top = 20;
+sun.shadow.camera.bottom = -20;
+scene.add(sun);
 
-const ground = new THREE.Mesh(
-  new THREE.BoxGeometry(20, 1, 20),
-  new THREE.MeshStandardMaterial({ color: '#94a3b8' })
-);
-ground.position.set(0, -0.5, 0);
-ground.receiveShadow = true;
-scene.add(ground);
+const input = { forward: 0, turn: 0, turbo: false };
+const pressed = new Set();
+
+const onKey = (event, down) => {
+  const k = event.key.toLowerCase();
+  if (down) {
+    pressed.add(k);
+  } else {
+    pressed.delete(k);
+  }
+  input.forward = (pressed.has('w') || pressed.has('arrowup') ? 1 : 0) + (pressed.has('s') || pressed.has('arrowdown') ? -1 : 0);
+  input.turn = (pressed.has('a') || pressed.has('arrowleft') ? 1 : 0) + (pressed.has('d') || pressed.has('arrowright') ? -1 : 0);
+  input.turbo = pressed.has('shift');
+};
+
+window.addEventListener('keydown', (e) => onKey(e, true));
+window.addEventListener('keyup', (e) => onKey(e, false));
 
 await RAPIER.init();
 const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
+world.timestep = 1 / 60;
 
-const groundBody = world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(0, -0.5, 0));
-world.createCollider(RAPIER.ColliderDesc.cuboid(10, 0.5, 10), groundBody);
+const physicsMeshes = [];
+const qTmp = new THREE.Quaternion();
+const vTmp = new THREE.Vector3();
 
-const dynamicBodies = [];
-const boxGeo = new THREE.BoxGeometry(0.7, 0.7, 0.7);
+function addRigidMesh(body, mesh) {
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  scene.add(mesh);
+  physicsMeshes.push({ body, mesh });
+}
 
-for (let i = 0; i < 50; i++) {
-  const x = (Math.random() - 0.5) * 4;
-  const y = 2 + i * 0.75;
-  const z = (Math.random() - 0.5) * 4;
-
-  const body = world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(x, y, z));
-  world.createCollider(RAPIER.ColliderDesc.cuboid(0.35, 0.35, 0.35).setRestitution(0.25), body);
+function makeFixedBox(x, y, z, hx, hy, hz, color = '#8b9bb2', rotY = 0) {
+  const body = world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(x, y, z).setRotation({ x: 0, y: Math.sin(rotY / 2), z: 0, w: Math.cos(rotY / 2) }));
+  const collider = RAPIER.ColliderDesc.cuboid(hx, hy, hz).setFriction(1.2);
+  world.createCollider(collider, body);
 
   const mesh = new THREE.Mesh(
-    boxGeo,
-    new THREE.MeshStandardMaterial({ color: new THREE.Color(`hsl(${180 + i * 3}, 70%, 55%)`) })
+    new THREE.BoxGeometry(hx * 2, hy * 2, hz * 2),
+    new THREE.MeshStandardMaterial({ color })
   );
-  mesh.castShadow = true;
-  scene.add(mesh);
-
-  dynamicBodies.push({ body, mesh });
+  addRigidMesh(body, mesh);
 }
 
-function tick() {
-  world.step();
+makeFixedBox(0, -0.6, 0, 25, 0.6, 25, '#9aadc4');
+makeFixedBox(5.5, -0.2, 0, 2, 0.2, 2.5, '#6f8098', -0.42);
+makeFixedBox(10.2, 0.18, 0.8, 1.7, 0.18, 2.1, '#6f8098', 0.18);
+makeFixedBox(14.8, 0.58, -0.5, 1.5, 0.18, 2, '#6f8098', -0.28);
 
-  for (const { body, mesh } of dynamicBodies) {
-    const p = body.translation();
-    const r = body.rotation();
-    mesh.position.set(p.x, p.y, p.z);
-    mesh.quaternion.set(r.x, r.y, r.z, r.w);
+for (let i = 0; i < 28; i++) {
+  const x = 6 + i * 0.9;
+  const z = ((i % 4) - 1.5) * 0.75;
+  const h = 0.2 + (i % 3) * 0.12;
+  makeFixedBox(x, h * 0.5 - 0.02, z, 0.28, h * 0.5, 0.28, i % 2 ? '#5e7492' : '#4f6484');
+}
+
+const torsoBody = world.createRigidBody(
+  RAPIER.RigidBodyDesc.dynamic().setTranslation(0, 1.15, 0).setCanSleep(false).setAdditionalMass(8)
+);
+world.createCollider(RAPIER.ColliderDesc.cuboid(0.36, 0.09, 0.2).setDensity(1.2).setFriction(1.1), torsoBody);
+
+const torsoMesh = new THREE.Mesh(
+  new THREE.BoxGeometry(0.72, 0.18, 0.4),
+  new THREE.MeshStandardMaterial({ color: '#203146', metalness: 0.25, roughness: 0.45 })
+);
+addRigidMesh(torsoBody, torsoMesh);
+
+const headMesh = new THREE.Mesh(
+  new THREE.BoxGeometry(0.14, 0.1, 0.2),
+  new THREE.MeshStandardMaterial({ color: '#86a5cc', metalness: 0.15, roughness: 0.4 })
+);
+headMesh.position.set(0.4, 0.02, 0);
+torsoMesh.add(headMesh);
+
+const legDefs = [
+  { name: 'FL', x: 0.26, z: 0.17, phase: 0 },
+  { name: 'FR', x: 0.26, z: -0.17, phase: Math.PI },
+  { name: 'RL', x: -0.26, z: 0.17, phase: Math.PI },
+  { name: 'RR', x: -0.26, z: -0.17, phase: 0 }
+];
+
+const legs = [];
+const upperLen = 0.2;
+const lowerLen = 0.22;
+
+for (const leg of legDefs) {
+  const hipWorld = { x: leg.x, y: 1.07, z: leg.z };
+
+  const upper = world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(hipWorld.x, hipWorld.y - upperLen * 0.5, hipWorld.z));
+  world.createCollider(RAPIER.ColliderDesc.capsule(upperLen * 0.35, 0.045).setDensity(0.7).setFriction(1.0), upper);
+
+  const lower = world.createRigidBody(
+    RAPIER.RigidBodyDesc.dynamic().setTranslation(hipWorld.x, hipWorld.y - upperLen - lowerLen * 0.5, hipWorld.z)
+  );
+  world.createCollider(RAPIER.ColliderDesc.capsule(lowerLen * 0.35, 0.04).setDensity(0.65).setFriction(1.3), lower);
+  world.createCollider(RAPIER.ColliderDesc.ball(0.05).setTranslation(0, -lowerLen * 0.52, 0).setFriction(2.5).setRestitution(0.03), lower);
+
+  const upperMesh = new THREE.Mesh(
+    new THREE.CapsuleGeometry(0.045, upperLen * 0.7, 8, 14),
+    new THREE.MeshStandardMaterial({ color: '#0d1b2e', roughness: 0.55 })
+  );
+  const lowerMesh = new THREE.Mesh(
+    new THREE.CapsuleGeometry(0.04, lowerLen * 0.7, 8, 14),
+    new THREE.MeshStandardMaterial({ color: '#2f435e', roughness: 0.5 })
+  );
+  addRigidMesh(upper, upperMesh);
+  addRigidMesh(lower, lowerMesh);
+
+  const hipJoint = world.createImpulseJoint(
+    RAPIER.JointData.revolute({ x: leg.x, y: -0.04, z: leg.z }, { x: 0, y: upperLen * 0.45, z: 0 }, { x: 1, y: 0, z: 0 }),
+    torsoBody,
+    upper,
+    true
+  );
+  hipJoint.setLimits(-0.65, 0.65);
+  hipJoint.configureMotorModel(RAPIER.MotorModel.ForceBased);
+
+  const kneeJoint = world.createImpulseJoint(
+    RAPIER.JointData.revolute({ x: 0, y: -upperLen * 0.45, z: 0 }, { x: 0, y: lowerLen * 0.45, z: 0 }, { x: 1, y: 0, z: 0 }),
+    upper,
+    lower,
+    true
+  );
+  kneeJoint.setLimits(-1.35, 0.2);
+  kneeJoint.configureMotorModel(RAPIER.MotorModel.ForceBased);
+
+  legs.push({ ...leg, hipJoint, kneeJoint, upper, lower });
+}
+
+for (let i = 0; i < 24; i++) {
+  const body = world.createRigidBody(
+    RAPIER.RigidBodyDesc.dynamic().setTranslation(4.8 + i * 0.5, 1.3 + i * 0.08, ((i % 3) - 1) * 0.5)
+  );
+  world.createCollider(RAPIER.ColliderDesc.cuboid(0.14, 0.14, 0.14).setDensity(0.35).setRestitution(0.15), body);
+  const mesh = new THREE.Mesh(
+    new THREE.BoxGeometry(0.28, 0.28, 0.28),
+    new THREE.MeshStandardMaterial({ color: i % 2 ? '#f59e0b' : '#94a3b8' })
+  );
+  addRigidMesh(body, mesh);
+}
+
+const chasePos = new THREE.Vector3();
+const chaseLook = new THREE.Vector3();
+
+let t = 0;
+const clock = new THREE.Clock();
+
+function driveController(dt) {
+  const boost = input.turbo ? 1.8 : 1;
+  const gaitHz = (1.6 + Math.abs(input.forward) * 1.6 + Math.abs(input.turn) * 0.6) * boost;
+  t += dt * gaitHz;
+
+  const stride = (0.25 + Math.abs(input.forward) * 0.5) * boost;
+  const kneeLift = 0.85 + Math.abs(input.forward) * 0.45;
+  const damping = 7 + Math.abs(input.forward) * 6;
+  const stiffness = 40 + Math.abs(input.forward) * 45;
+
+  for (const leg of legs) {
+    const cycle = t * Math.PI * 2 + leg.phase + input.turn * (leg.z > 0 ? 0.28 : -0.28);
+    const hipTarget = Math.sin(cycle) * stride;
+    const kneeTarget = -0.7 - Math.max(0, Math.cos(cycle)) * kneeLift;
+
+    leg.hipJoint.configureMotorPosition(hipTarget, stiffness, damping);
+    leg.kneeJoint.configureMotorPosition(kneeTarget, stiffness * 0.92, damping * 1.05);
   }
 
-  renderer.render(scene, camera);
-  requestAnimationFrame(tick);
+  const rbRot = torsoBody.rotation();
+  qTmp.set(rbRot.x, rbRot.y, rbRot.z, rbRot.w);
+
+  const forward = vTmp.set(1, 0, 0).applyQuaternion(qTmp).setY(0).normalize();
+  const push = 10.5 * input.forward * boost;
+  torsoBody.applyImpulse({ x: forward.x * push * dt, y: 0, z: forward.z * push * dt }, true);
+
+  torsoBody.applyTorqueImpulse({ x: 0, y: input.turn * (0.38 + Math.abs(input.forward) * 0.12) * boost * dt, z: 0 }, true);
+
+  if (pressed.has(' ')) {
+    torsoBody.applyImpulse({ x: 0, y: 0.7, z: 0 }, true);
+  }
 }
 
-tick();
+function updateCamera() {
+  const pos = torsoBody.translation();
+  const rot = torsoBody.rotation();
+  qTmp.set(rot.x, rot.y, rot.z, rot.w);
+
+  const forward = new THREE.Vector3(1, 0, 0).applyQuaternion(qTmp).setY(0).normalize();
+  const side = new THREE.Vector3(0, 0, 1).applyQuaternion(qTmp).setY(0).normalize();
+
+  chasePos.set(pos.x, pos.y, pos.z).addScaledVector(forward, -3.6).addScaledVector(side, 1.2).add(new THREE.Vector3(0, 2.0, 0));
+  chaseLook.set(pos.x, pos.y + 0.2, pos.z).addScaledVector(forward, 2.2);
+
+  camera.position.lerp(chasePos, 0.08);
+  camera.lookAt(chaseLook);
+}
+
+function syncMeshes() {
+  for (const entry of physicsMeshes) {
+    const p = entry.body.translation();
+    const r = entry.body.rotation();
+    entry.mesh.position.set(p.x, p.y, p.z);
+    entry.mesh.quaternion.set(r.x, r.y, r.z, r.w);
+  }
+}
+
+function updateHud() {
+  const vel = torsoBody.linvel();
+  const speed = Math.hypot(vel.x, vel.z);
+  const mode = input.turbo ? 'TURBO' : 'WALK';
+  statusEl.textContent = `${mode} | speed ${speed.toFixed(2)} m/s`;
+  hintEl.textContent = 'WASD move, Shift turbo, Space hop';
+}
+
+function loop() {
+  const dt = Math.min(clock.getDelta(), 1 / 30);
+  driveController(dt);
+  world.step();
+  syncMeshes();
+  updateCamera();
+  updateHud();
+  renderer.render(scene, camera);
+  requestAnimationFrame(loop);
+}
+
+loop();
 
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;

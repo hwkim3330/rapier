@@ -1,5 +1,5 @@
 :root {
-  color: #111;
+  color: #0f172a;
   font-family: "Segoe UI", Arial, sans-serif;
 }
 
@@ -14,7 +14,7 @@ body,
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: linear-gradient(180deg, #dbeafe 0%, #f8fafc 45%, #e2e8f0 100%);
+  background: radial-gradient(circle at 20% 10%, #f6fbff 0%, #e5effd 35%, #c4d6ef 100%);
 }
 
 #scene {
@@ -30,13 +30,14 @@ body,
   z-index: 2;
   padding: 10px 12px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.78);
+  background: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(4px);
+  border: 1px solid rgba(33, 49, 70, 0.15);
 }
 
 .hud h1 {
   margin: 0 0 4px;
-  font-size: 16px;
+  font-size: 15px;
 }
 
 .hud p {

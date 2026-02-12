@@ -3,14 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Rapier WASM Demo</title>
+    <title>Rapier Quadruped Sandbox</title>
     <script type="module" src="/src/main.js"></script>
   </head>
   <body>
     <div id="app">
       <div class="hud">
-        <h1>Rapier WASM Physics</h1>
-        <p>Falling boxes simulated in browser.</p>
+        <h1>Rapier Quadruped Sandbox</h1>
+        <p id="status">Booting physics...</p>
+        <p id="hint">WASD move, Shift turbo, Space hop</p>
       </div>
       <canvas id="scene"></canvas>
     </div>
