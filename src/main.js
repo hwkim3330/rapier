@@ -1,10 +1,12 @@
 import './style.css';
 import * as THREE from 'three';
+import { ColladaLoader } from 'three/examples/jsm/loaders/ColladaLoader.js';
 import RAPIER from '@dimforge/rapier3d-compat';
 
 const canvas = document.getElementById('scene');
 const statusEl = document.getElementById('status');
 const hintEl = document.getElementById('hint');
+const modelSelectEl = document.getElementById('modelSelect');
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -156,7 +158,7 @@ for (const leg of legDefs) {
   kneeJoint.setLimits(-1.35, 0.2);
   kneeJoint.configureMotorModel(RAPIER.MotorModel.ForceBased);
 
-  legs.push({ ...leg, hipJoint, kneeJoint, upper, lower });
+  legs.push({ ...leg, hipJoint, kneeJoint, upper, lower, upperMesh, lowerMesh });
 }
 
 for (let i = 0; i < 24; i++) {
@@ -173,6 +175,166 @@ for (let i = 0; i < 24; i++) {
 
 const chasePos = new THREE.Vector3();
 const chaseLook = new THREE.Vector3();
+const skinCache = new Map();
+let activeSkinKey = 'a1';
+let isLoadingSkin = false;
+
+const MODEL_PRESETS = {
+  a1: {
+    label: 'Unitree A1',
+    base: 'https://raw.githubusercontent.com/unitreerobotics/unitree_ros/master/robots/a1_description/meshes',
+    color: { trunk: '#dbe4f2', thigh: '#b6c4d9', calf: '#a2b4cd' }
+  },
+  aliengo: {
+    label: 'Unitree AlienGo',
+    base: 'https://raw.githubusercontent.com/unitreerobotics/unitree_ros/master/robots/aliengo_description/meshes',
+    color: { trunk: '#d7deeb', thigh: '#a7b8d0', calf: '#90a7c8' }
+  },
+  b2: {
+    label: 'Unitree B2',
+    base: 'https://raw.githubusercontent.com/unitreerobotics/unitree_ros/master/robots/b2_description/meshes',
+    color: { trunk: '#ced8e8', thigh: '#9baec9', calf: '#839ab8' }
+  }
+};
+
+function finalizeTemplate(root, targetMaxDim, tone = null) {
+  const model = root.clone(true);
+  model.traverse((node) => {
+    if (node.isMesh) {
+      node.castShadow = true;
+      node.receiveShadow = true;
+      node.material = new THREE.MeshStandardMaterial({
+        color: tone || '#d4dce8',
+        metalness: 0.2,
+        roughness: 0.55
+      });
+    }
+  });
+
+  let box = new THREE.Box3().setFromObject(model);
+  const size = box.getSize(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z) || 1;
+  const s = targetMaxDim / maxDim;
+  model.scale.setScalar(s);
+
+  box = new THREE.Box3().setFromObject(model);
+  const center = box.getCenter(new THREE.Vector3());
+  model.position.sub(center);
+
+  return model;
+}
+
+function clearCurrentSkin() {
+  while (torsoMesh.children.length) {
+    torsoMesh.remove(torsoMesh.children[0]);
+  }
+  torsoMesh.add(headMesh);
+  for (const leg of legs) {
+    leg.upperMesh.clear();
+    leg.lowerMesh.clear();
+  }
+  torsoMesh.visible = true;
+  headMesh.visible = true;
+  for (const leg of legs) {
+    leg.upperMesh.visible = true;
+    leg.lowerMesh.visible = true;
+  }
+}
+
+async function loadSkinAssets(modelKey) {
+  if (skinCache.has(modelKey)) {
+    return skinCache.get(modelKey);
+  }
+
+  const preset = MODEL_PRESETS[modelKey];
+  if (!preset) {
+    throw new Error(`Unknown model preset: ${modelKey}`);
+  }
+
+  const loader = new ColladaLoader();
+
+  const loadDae = (url) =>
+    new Promise((resolve, reject) => {
+      loader.load(url, (data) => resolve(data.scene), undefined, reject);
+    });
+
+  const [trunkRaw, thighRaw, calfRaw] = await Promise.all([
+    loadDae(`${preset.base}/trunk.dae`),
+    loadDae(`${preset.base}/thigh.dae`),
+    loadDae(`${preset.base}/calf.dae`)
+  ]);
+
+  const assets = {
+    trunk: finalizeTemplate(trunkRaw, 0.9, preset.color.trunk),
+    thigh: finalizeTemplate(thighRaw, 0.32, preset.color.thigh),
+    calf: finalizeTemplate(calfRaw, 0.32, preset.color.calf)
+  };
+  skinCache.set(modelKey, assets);
+  return assets;
+}
+
+async function applySkin(modelKey) {
+  const preset = MODEL_PRESETS[modelKey];
+  if (!preset) {
+    return;
+  }
+
+  isLoadingSkin = true;
+  statusEl.textContent = `Loading ${preset.label} skin...`;
+  clearCurrentSkin();
+
+  try {
+    const assets = await loadSkinAssets(modelKey);
+    const trunkVisual = assets.trunk.clone(true);
+    trunkVisual.rotation.y = Math.PI * 0.5;
+    trunkVisual.position.y += 0.02;
+    torsoMesh.visible = false;
+    headMesh.visible = false;
+    torsoMesh.add(trunkVisual);
+
+    for (const leg of legs) {
+      const thighVisual = assets.thigh.clone(true);
+      thighVisual.rotation.z = Math.PI * 0.5;
+      thighVisual.position.y += 0.02;
+      leg.upperMesh.visible = false;
+      leg.upperMesh.add(thighVisual);
+
+      const calfVisual = assets.calf.clone(true);
+      calfVisual.rotation.z = Math.PI * 0.5;
+      calfVisual.position.y -= 0.03;
+      leg.lowerMesh.visible = false;
+      leg.lowerMesh.add(calfVisual);
+    }
+
+    activeSkinKey = modelKey;
+  } catch (err) {
+    console.warn('Unitree skin load failed:', err);
+    statusEl.textContent = `${preset.label} load failed, fallback render`;
+  } finally {
+    isLoadingSkin = false;
+  }
+}
+
+async function initSkins() {
+  modelSelectEl.addEventListener('change', async (event) => {
+    const key = event.target.value;
+    await applySkin(key);
+  });
+
+  window.addEventListener('keydown', async (event) => {
+    const map = { '1': 'a1', '2': 'aliengo', '3': 'b2' };
+    const key = map[event.key];
+    if (!key) {
+      return;
+    }
+    modelSelectEl.value = key;
+    await applySkin(key);
+  });
+
+  await applySkin(activeSkinKey);
+}
+
+initSkins();
 
 let t = 0;
 const clock = new THREE.Clock();
@@ -238,8 +400,11 @@ function updateHud() {
   const vel = torsoBody.linvel();
   const speed = Math.hypot(vel.x, vel.z);
   const mode = input.turbo ? 'TURBO' : 'WALK';
-  statusEl.textContent = `${mode} | speed ${speed.toFixed(2)} m/s`;
-  hintEl.textContent = 'WASD move, Shift turbo, Space hop';
+  const model = MODEL_PRESETS[activeSkinKey]?.label ?? 'Fallback';
+  hintEl.textContent = 'WASD move, Shift turbo, Space hop, 1/2/3 model';
+  if (!isLoadingSkin) {
+    statusEl.textContent = `${model} | ${mode} | speed ${speed.toFixed(2)} m/s`;
+  }
 }
 
 function loop() {
