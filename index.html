@@ -3,44 +3,53 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Rapier Quadruped Sandbox</title>
+    <title>Sim Lab</title>
     <script type="module" src="/src/main.js"></script>
   </head>
   <body>
     <div id="app">
-      <div class="hud">
-        <h1>Rapier Quadruped Sandbox</h1>
-        <p id="status">Booting physics...</p>
-        <label class="model-picker">
-          <span>Model</span>
-          <select id="modelSelect">
-            <option value="a1">Unitree A1</option>
-            <option value="aliengo">Unitree AlienGo</option>
-            <option value="b2">Unitree B2</option>
-            <option value="duckmini">OpenDuck Mini</option>
-            <option value="h1">Unitree H1 (Stylized)</option>
+      <aside class="hud">
+        <h1>Sim Lab</h1>
+        <p id="subtitle">1) Isaac-style 2) Mobile 3) Humanoid</p>
+
+        <div class="row">
+          <label for="modeSelect">Mode</label>
+          <select id="modeSelect">
+            <option value="isaac">1) Isaac Style</option>
+            <option value="mobile">2) Mobile Priority</option>
+            <option value="humanoid">3) Humanoid</option>
           </select>
-        </label>
-        <label class="model-picker">
-          <span>Scene</span>
-          <select id="sceneSelect">
-            <option value="stairs">Stairs</option>
-            <option value="flat">Flat</option>
-            <option value="slope">Slope</option>
-          </select>
-          <button id="resetBtn" class="mini-btn">Reset</button>
-        </label>
-        <p id="telemetry">speed 0.00 | pitch 0.0 | roll 0.0</p>
-        <p id="hint">WASD move, Shift turbo, Space hop</p>
-      </div>
+          <button id="resetBtn">Reset</button>
+        </div>
+
+        <div class="panel">
+          <h2>Physics</h2>
+          <p id="physicsStats">-</p>
+        </div>
+        <div class="panel">
+          <h2>Sensors</h2>
+          <p id="sensorStats">-</p>
+        </div>
+        <div class="panel">
+          <h2>Camera</h2>
+          <p id="cameraStats">-</p>
+        </div>
+        <p id="hint">WASD move, Shift turbo, Space jump</p>
+      </aside>
+
       <canvas id="scene"></canvas>
-      <div class="touch-pad" id="touchPad">
-        <button data-key="w" class="btn up">↑</button>
-        <button data-key="a" class="btn left">←</button>
-        <button data-key="d" class="btn right">→</button>
-        <button data-key="s" class="btn down">↓</button>
-        <button data-key="shift" class="btn turbo">T</button>
-        <button data-key=" " class="btn jump">J</button>
+
+      <div class="touch" id="touch">
+        <div class="touch-group">
+          <button class="touch-btn" data-key="w">W</button>
+          <button class="touch-btn" data-key="a">A</button>
+          <button class="touch-btn" data-key="s">S</button>
+          <button class="touch-btn" data-key="d">D</button>
+        </div>
+        <div class="touch-group">
+          <button class="touch-btn" data-key="shift">Turbo</button>
+          <button class="touch-btn" data-key=" ">Jump</button>
+        </div>
       </div>
     </div>
   </body>

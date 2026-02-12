@@ -1,5 +1,5 @@
 :root {
-  color: #0f172a;
+  color: #102033;
   font-family: "Segoe UI", Arial, sans-serif;
 }
 
@@ -10,11 +10,11 @@
 html,
 body,
 #app {
-  margin: 0;
   width: 100%;
   height: 100%;
+  margin: 0;
   overflow: hidden;
-  background: radial-gradient(circle at 20% 10%, #f6fbff 0%, #e5effd 35%, #c4d6ef 100%);
+  background: radial-gradient(circle at 20% 0%, #f4f8ff 0%, #d5e5fb 42%, #b7cbe7 100%);
 }
 
 #scene {
@@ -26,89 +26,106 @@ body,
 
 .hud {
   position: fixed;
-  top: 14px;
-  left: 14px;
-  z-index: 2;
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(4px);
-  border: 1px solid rgba(33, 49, 70, 0.15);
+  top: 12px;
+  left: 12px;
+  width: min(360px, calc(100vw - 24px));
+  z-index: 5;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(16, 32, 51, 0.16);
+  border-radius: 12px;
+  backdrop-filter: blur(6px);
+  padding: 12px;
 }
 
 .hud h1 {
-  margin: 0 0 4px;
-  font-size: 15px;
+  margin: 0;
+  font-size: 18px;
+}
+
+.hud h2 {
+  margin: 0 0 2px;
+  font-size: 12px;
 }
 
 .hud p {
   margin: 0;
   font-size: 12px;
-  color: #334155;
+  color: #29405f;
 }
 
-.model-picker {
-  margin: 8px 0 6px;
-  display: flex;
-  align-items: center;
+#subtitle {
+  margin-top: 2px;
+  margin-bottom: 8px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
   gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.row label {
   font-size: 12px;
-  color: #334155;
 }
 
-.model-picker select {
-  border: 1px solid rgba(33, 49, 70, 0.28);
-  border-radius: 6px;
-  padding: 3px 8px;
+.row select,
+.row button {
+  border: 1px solid rgba(16, 32, 51, 0.28);
+  background: rgba(255, 255, 255, 0.94);
+  border-radius: 8px;
+  height: 30px;
   font-size: 12px;
-  background: rgba(255, 255, 255, 0.92);
-  color: #0f172a;
+  color: #102033;
 }
 
-.mini-btn {
-  border: 1px solid rgba(33, 49, 70, 0.28);
-  border-radius: 6px;
-  padding: 3px 8px;
-  font-size: 12px;
-  background: rgba(255, 255, 255, 0.92);
-  color: #0f172a;
+.panel {
+  margin-bottom: 6px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(226, 236, 250, 0.55);
 }
 
-.mini-btn:active {
-  background: rgba(59, 130, 246, 0.2);
-}
-
-.touch-pad {
+.touch {
   position: fixed;
   left: 50%;
   bottom: 12px;
   transform: translateX(-50%);
-  width: min(92vw, 420px);
   display: none;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 8px;
-  z-index: 4;
+  gap: 10px;
+  z-index: 6;
 }
 
-.touch-pad .btn {
-  border: 1px solid rgba(33, 49, 70, 0.24);
-  background: rgba(255, 255, 255, 0.88);
-  color: #0f172a;
+.touch-group {
+  display: grid;
+  grid-template-columns: repeat(2, 64px);
+  gap: 8px;
+}
+
+.touch-btn {
+  height: 52px;
+  border-radius: 12px;
+  border: 1px solid rgba(16, 32, 51, 0.25);
+  background: rgba(255, 255, 255, 0.9);
+  color: #102033;
   font-weight: 700;
-  border-radius: 10px;
-  height: 46px;
-  font-size: 16px;
+  font-size: 14px;
   touch-action: manipulation;
 }
 
-.touch-pad .btn:active,
-.touch-pad .btn.active {
-  background: rgba(59, 130, 246, 0.2);
-  border-color: rgba(37, 99, 235, 0.55);
+.touch-btn.active,
+.touch-btn:active {
+  background: rgba(59, 130, 246, 0.24);
+  border-color: rgba(37, 99, 235, 0.62);
 }
 
 @media (max-width: 900px), (pointer: coarse) {
-  .touch-pad {
-    display: grid;
+  .touch {
+    display: flex;
+  }
+
+  .hud {
+    width: min(96vw, 380px);
   }
 }
