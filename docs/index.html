@@ -4,8 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Rapier Quadruped Sandbox</title>
-    <script type="module" crossorigin src="/rapier/assets/index-Dtumwm2Z.js"></script>
-    <link rel="stylesheet" crossorigin href="/rapier/assets/index-CYj3P6NF.css">
+    <script type="module" crossorigin src="/rapier/assets/index-CVzj8cEB.js"></script>
+    <link rel="stylesheet" crossorigin href="/rapier/assets/index-C3-_EbhK.css">
   </head>
   <body>
     <div id="app">
@@ -22,6 +22,16 @@
             <option value="h1">Unitree H1 (Stylized)</option>
           </select>
         </label>
+        <label class="model-picker">
+          <span>Scene</span>
+          <select id="sceneSelect">
+            <option value="stairs">Stairs</option>
+            <option value="flat">Flat</option>
+            <option value="slope">Slope</option>
+          </select>
+          <button id="resetBtn" class="mini-btn">Reset</button>
+        </label>
+        <p id="telemetry">speed 0.00 | pitch 0.0 | roll 0.0</p>
         <p id="hint">WASD move, Shift turbo, Space hop</p>
       </div>
       <canvas id="scene"></canvas>

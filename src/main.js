@@ -6,7 +6,10 @@ import RAPIER from '@dimforge/rapier3d-compat';
 const canvas = document.getElementById('scene');
 const statusEl = document.getElementById('status');
 const hintEl = document.getElementById('hint');
+const telemetryEl = document.getElementById('telemetry');
 const modelSelectEl = document.getElementById('modelSelect');
+const sceneSelectEl = document.getElementById('sceneSelect');
+const resetBtnEl = document.getElementById('resetBtn');
 const touchPadEl = document.getElementById('touchPad');
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -101,6 +104,10 @@ world.timestep = 1 / 60;
 const physicsMeshes = [];
 const qTmp = new THREE.Quaternion();
 const vTmp = new THREE.Vector3();
+const eulerTmp = new THREE.Euler();
+const terrainBodies = [];
+const obstacleBodies = [];
+let currentSceneKey = 'stairs';
 
 function addRigidMesh(body, mesh) {
   mesh.castShadow = true;
@@ -119,18 +126,61 @@ function makeFixedBox(x, y, z, hx, hy, hz, color = '#8b9bb2', rotY = 0) {
     new THREE.MeshStandardMaterial({ color })
   );
   addRigidMesh(body, mesh);
+  terrainBodies.push(body);
+  return body;
 }
 
-makeFixedBox(0, -0.6, 0, 25, 0.6, 25, '#9aadc4');
-makeFixedBox(5.5, -0.2, 0, 2, 0.2, 2.5, '#6f8098', -0.42);
-makeFixedBox(10.2, 0.18, 0.8, 1.7, 0.18, 2.1, '#6f8098', 0.18);
-makeFixedBox(14.8, 0.58, -0.5, 1.5, 0.18, 2, '#6f8098', -0.28);
+function spawnDynamicObstacle(x, y, z, half = 0.14, tone = '#94a3b8') {
+  const body = world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(x, y, z));
+  world.createCollider(RAPIER.ColliderDesc.cuboid(half, half, half).setDensity(0.35).setRestitution(0.15), body);
+  const mesh = new THREE.Mesh(
+    new THREE.BoxGeometry(half * 2, half * 2, half * 2),
+    new THREE.MeshStandardMaterial({ color: tone })
+  );
+  addRigidMesh(body, mesh);
+  obstacleBodies.push(body);
+}
 
-for (let i = 0; i < 28; i++) {
-  const x = 6 + i * 0.9;
-  const z = ((i % 4) - 1.5) * 0.75;
-  const h = 0.2 + (i % 3) * 0.12;
-  makeFixedBox(x, h * 0.5 - 0.02, z, 0.28, h * 0.5, 0.28, i % 2 ? '#5e7492' : '#4f6484');
+function clearRigidSet(items) {
+  while (items.length) {
+    world.removeRigidBody(items.pop());
+  }
+}
+
+function rebuildSceneTerrain(mode) {
+  clearRigidSet(terrainBodies);
+  clearRigidSet(obstacleBodies);
+
+  makeFixedBox(0, -0.6, 0, 30, 0.6, 30, '#9aadc4');
+
+  if (mode === 'flat') {
+    for (let i = 0; i < 18; i++) {
+      spawnDynamicObstacle(4.5 + i * 0.7, 1.0 + i * 0.06, ((i % 3) - 1) * 0.7, 0.16, i % 2 ? '#f59e0b' : '#94a3b8');
+    }
+    return;
+  }
+
+  if (mode === 'slope') {
+    makeFixedBox(8.5, 0.4, 0, 6.0, 0.2, 2.6, '#637998', -0.44);
+    makeFixedBox(16.5, 2.2, 0, 6.0, 0.2, 2.6, '#5e7492', -0.44);
+    for (let i = 0; i < 16; i++) {
+      spawnDynamicObstacle(10 + i * 0.55, 1.4 + i * 0.08, ((i % 2) - 0.5) * 0.8, 0.13, i % 2 ? '#f59e0b' : '#94a3b8');
+    }
+    return;
+  }
+
+  makeFixedBox(5.5, -0.2, 0, 2, 0.2, 2.5, '#6f8098', -0.42);
+  makeFixedBox(10.2, 0.18, 0.8, 1.7, 0.18, 2.1, '#6f8098', 0.18);
+  makeFixedBox(14.8, 0.58, -0.5, 1.5, 0.18, 2, '#6f8098', -0.28);
+  for (let i = 0; i < 28; i++) {
+    const x = 6 + i * 0.9;
+    const z = ((i % 4) - 1.5) * 0.75;
+    const h = 0.2 + (i % 3) * 0.12;
+    makeFixedBox(x, h * 0.5 - 0.02, z, 0.28, h * 0.5, 0.28, i % 2 ? '#5e7492' : '#4f6484');
+  }
+  for (let i = 0; i < 12; i++) {
+    spawnDynamicObstacle(6.5 + i * 0.7, 1.2 + i * 0.09, ((i % 3) - 1) * 0.5, 0.14, i % 2 ? '#f59e0b' : '#94a3b8');
+  }
 }
 
 const torsoBody = world.createRigidBody(
@@ -206,17 +256,21 @@ for (const leg of legDefs) {
   legs.push({ ...leg, hipJoint, kneeJoint, upper, lower, upperMesh, lowerMesh });
 }
 
-for (let i = 0; i < 24; i++) {
-  const body = world.createRigidBody(
-    RAPIER.RigidBodyDesc.dynamic().setTranslation(4.8 + i * 0.5, 1.3 + i * 0.08, ((i % 3) - 1) * 0.5)
-  );
-  world.createCollider(RAPIER.ColliderDesc.cuboid(0.14, 0.14, 0.14).setDensity(0.35).setRestitution(0.15), body);
-  const mesh = new THREE.Mesh(
-    new THREE.BoxGeometry(0.28, 0.28, 0.28),
-    new THREE.MeshStandardMaterial({ color: i % 2 ? '#f59e0b' : '#94a3b8' })
-  );
-  addRigidMesh(body, mesh);
+function resetRobotPose() {
+  torsoBody.setTranslation({ x: 0, y: 1.15, z: 0 }, true);
+  torsoBody.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true);
+  torsoBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
+  torsoBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
+  for (const leg of legs) {
+    leg.upper.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    leg.upper.setAngvel({ x: 0, y: 0, z: 0 }, true);
+    leg.lower.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    leg.lower.setAngvel({ x: 0, y: 0, z: 0 }, true);
+  }
+  gaitPhase = 0;
 }
+
+rebuildSceneTerrain(currentSceneKey);
 
 const chasePos = new THREE.Vector3();
 const chaseLook = new THREE.Vector3();
@@ -520,15 +574,41 @@ async function initSkins() {
   await applySkin(activeSkinKey);
 }
 
+function initSceneControls() {
+  if (sceneSelectEl) {
+    sceneSelectEl.value = currentSceneKey;
+    sceneSelectEl.addEventListener('change', () => {
+      currentSceneKey = sceneSelectEl.value;
+      rebuildSceneTerrain(currentSceneKey);
+      resetRobotPose();
+    });
+  }
+  if (resetBtnEl) {
+    resetBtnEl.addEventListener('click', () => {
+      resetRobotPose();
+    });
+  }
+  window.addEventListener('keydown', (event) => {
+    const map = { '6': 'flat', '7': 'stairs', '8': 'slope' };
+    const key = map[event.key];
+    if (!key) return;
+    currentSceneKey = key;
+    if (sceneSelectEl) sceneSelectEl.value = key;
+    rebuildSceneTerrain(currentSceneKey);
+    resetRobotPose();
+  });
+}
+
+initSceneControls();
 initSkins();
 
-let t = 0;
+let gaitPhase = 0;
 const clock = new THREE.Clock();
 
 function driveController(dt) {
   const boost = input.turbo ? 1.8 : 1;
   const gaitHz = (1.6 + Math.abs(input.forward) * 1.6 + Math.abs(input.turn) * 0.6) * boost;
-  t += dt * gaitHz;
+  gaitPhase += dt * gaitHz;
 
   const stride = (0.25 + Math.abs(input.forward) * 0.5) * boost;
   const kneeLift = 0.85 + Math.abs(input.forward) * 0.45;
@@ -536,7 +616,7 @@ function driveController(dt) {
   const stiffness = 40 + Math.abs(input.forward) * 45;
 
   for (const leg of legs) {
-    const cycle = t * Math.PI * 2 + leg.phase + input.turn * (leg.z > 0 ? 0.28 : -0.28);
+    const cycle = gaitPhase * Math.PI * 2 + leg.phase + input.turn * (leg.z > 0 ? 0.28 : -0.28);
     const hipTarget = Math.sin(cycle) * stride;
     const kneeTarget = -0.7 - Math.max(0, Math.cos(cycle)) * kneeLift;
 
@@ -587,7 +667,16 @@ function updateHud() {
   const speed = Math.hypot(vel.x, vel.z);
   const mode = input.turbo ? 'TURBO' : 'WALK';
   const model = MODEL_PRESETS[activeSkinKey]?.label ?? 'Fallback';
-  hintEl.textContent = 'WASD move, Shift turbo, Space hop, 1/2/3/4/5 model';
+  const sceneLabel = (sceneSelectEl?.value || currentSceneKey || '').toUpperCase();
+  const rot = torsoBody.rotation();
+  qTmp.set(rot.x, rot.y, rot.z, rot.w);
+  eulerTmp.setFromQuaternion(qTmp, 'YXZ');
+  const pitch = (eulerTmp.x * 180) / Math.PI;
+  const roll = (eulerTmp.z * 180) / Math.PI;
+  hintEl.textContent = 'WASD move, Shift turbo, Space hop, 1-5 model, 6/7/8 scene';
+  if (telemetryEl) {
+    telemetryEl.textContent = `scene ${sceneLabel} | speed ${speed.toFixed(2)} | pitch ${pitch.toFixed(1)} | roll ${roll.toFixed(1)}`;
+  }
   if (!isLoadingSkin) {
     statusEl.textContent = `${model} | ${mode} | speed ${speed.toFixed(2)} m/s`;
   }

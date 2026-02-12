@@ -65,6 +65,19 @@ body,
   color: #0f172a;
 }
 
+.mini-btn {
+  border: 1px solid rgba(33, 49, 70, 0.28);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #0f172a;
+}
+
+.mini-btn:active {
+  background: rgba(59, 130, 246, 0.2);
+}
+
 .touch-pad {
   position: fixed;
   left: 50%;
